@@ -435,19 +435,18 @@ function navigateTo(menuId) {
   if (window.lucide) lucide.createIcons();
 }
 
-
 function renderView(menuItem) {
   const contentEl = document.getElementById('app-content');
   if (!contentEl) return;
 
   const viewMap = {
-    dashboard: renderDashboardView,
-    experiments: renderExperimentsView,
-    materials: renderMaterialsView,
-    schedules: renderSchedulesView,
-    members: renderMembersView,
-    archive: renderArchiveView,
-    community: renderCommunityView
+    dashboard: typeof renderDashboardView === 'function' ? renderDashboardView : null,
+    experiments: typeof renderExperimentsView === 'function' ? renderExperimentsView : null,
+    materials: typeof renderMaterialsView === 'function' ? renderMaterialsView : null,
+    schedules: typeof renderSchedulesView === 'function' ? renderSchedulesView : null,
+    members: typeof renderMembersView === 'function' ? renderMembersView : null,
+    archive: typeof renderArchiveView === 'function' ? renderArchiveView : null,
+    community: typeof renderCommunityView === 'function' ? renderCommunityView : null
   };
 
   const renderFunction = viewMap[menuItem.id];

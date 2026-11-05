@@ -133,8 +133,13 @@ const Auth = (() => {
         localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
 
         updateUserUI();
+
+        // 로그인한 사용자 권한에 맞춰 메뉴 다시 생성
+        if (window.renderSidebarNav) window.renderSidebarNav();
+        if (window.renderMobileNav) window.renderMobileNav();
+
         closeLoginModal();
-        
+
         if (window.navigateTo) window.navigateTo('dashboard');
       } else {
         showLoginError(result.message || '인증 검증에 실패했습니다.');

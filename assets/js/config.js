@@ -7,7 +7,7 @@ window.CONFIG = {
   ALLOWED_DOMAIN: 'yanggok.hs.kr',
   
   // GAS Web App 배포 URL
-  GAS_API_URL: 'GAS_API_URL: "https://labit-api.ayden090410.workers.dev"',
+  GAS_API_URL: 'https://labit-api.ayden090410.workers.dev',
   
   // Google OAuth 2.0 Client ID
   GOOGLE_CLIENT_ID: '20979828869-0mbv7uonhcdu9ivdgntkcdg8k3hb4msr.apps.googleusercontent.com'

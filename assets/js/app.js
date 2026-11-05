@@ -1593,6 +1593,502 @@ async function archiveMaterialComment(id, materialId) {
   await openMaterialDetail(materialId);
 }
 
+// ==========================================
+// LABIT 추가 기능: 일정 / 동아리원 / 아카이브 / 커뮤니티
+// ==========================================
+
+window.LABIT = window.LABIT || {};
+window.LABIT.formSave = null;
+
+function labitEscape(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;',
+    '"': '&quot;', "'": '&#39;'
+  })[c]);
+}
+
+function labitCanManage(item, ownerField) {
+  const user = Auth.getUser();
+  return !!user && (
+    user.role === 'ADMIN' ||
+    String(item[ownerField]) === String(user.id)
+  );
+}
+
+function labitOpenForm(title, fields, saveHandler) {
+  window.LABIT.formSave = saveHandler;
+
+  const modal = document.createElement('div');
+  modal.id = 'labit-form-modal';
+  modal.className = 'fixed inset-0 z-[110] bg-slate-950/50 flex items-center justify-center p-3';
+
+  modal.innerHTML = `
+    <div class="bg-white w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl">
+      <div class="p-5 border-b flex justify-between items-center">
+        <h3 class="font-bold text-lg">${labitEscape(title)}</h3>
+        <button onclick="labitCloseForm()" class="text-slate-400 p-2">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <form onsubmit="labitSubmitForm(event)" class="p-5 space-y-4">
+        ${fields.map(f => `
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1">${labitEscape(f.label)}</label>
+            ${
+              f.type === 'textarea'
+                ? `<textarea name="${f.name}" maxlength="${f.maxlength || 5000}" ${f.required ? 'required' : ''} rows="4" class="w-full border rounded-xl p-3 text-sm">${labitEscape(f.value || '')}</textarea>`
+                : f.type === 'select'
+                  ? `<select name="${f.name}" class="w-full border rounded-xl p-3 text-sm">${f.options.map(o => `<option value="${labitEscape(o.value)}" ${String(o.value) === String(f.value) ? 'selected' : ''}>${labitEscape(o.label)}</option>`).join('')}</select>`
+                  : `<input name="${f.name}" type="${f.type || 'text'}" value="${labitEscape(f.value || '')}" maxlength="${f.maxlength || 300}" ${f.required ? 'required' : ''} class="w-full border rounded-xl p-3 text-sm">`
+            }
+          </div>
+        `).join('')}
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="labitCloseForm()" class="flex-1 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm">취소</button>
+          <button type="submit" class="flex-1 py-3 rounded-xl bg-labit-primary text-white font-bold text-sm">저장</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => {
+    if (e.target === modal) labitCloseForm();
+  });
+  if (window.lucide) lucide.createIcons();
+}
+
+function labitCloseForm() {
+  document.getElementById('labit-form-modal')?.remove();
+  window.LABIT.formSave = null;
+}
+
+async function labitSubmitForm(event) {
+  event.preventDefault();
+  const save = window.LABIT.formSave;
+  if (!save) return;
+
+  const data = Object.fromEntries(new FormData(event.target).entries());
+  const button = event.target.querySelector('[type="submit"]');
+  if (button) button.disabled = true;
+
+  try {
+    await save(data);
+  } catch (e) {
+    alert(e.message || '저장 중 오류가 발생했습니다.');
+    if (button) button.disabled = false;
+  }
+}
+
+function labitEmpty(message) {
+  return `<div class="text-center py-12 text-sm text-slate-400">${labitEscape(message)}</div>`;
+}
+
+function labitPageHeader(title, description, buttonText, onclick) {
+  return `
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+      <div>
+        <h2 class="text-xl font-bold text-labit-text">${title}</h2>
+        <p class="text-sm text-labit-subtext mt-1">${description}</p>
+      </div>
+      ${buttonText ? `<button onclick="${onclick}" class="px-4 py-2.5 rounded-xl bg-labit-primary text-white text-sm font-bold">${buttonText}</button>` : ''}
+    </div>
+  `;
+}
+
+
+// ==========================================
+// 1. 일정 및 활동
+// ==========================================
+
+async function renderSchedulesView(container) {
+  container.innerHTML = '<div class="py-16 text-center text-slate-400">일정을 불러오는 중...</div>';
+
+  const res = await API.post('schedules/list');
+  const schedules = res.success && Array.isArray(res.data) ? res.data : [];
+  window.LABIT.schedules = schedules;
+
+  container.innerHTML = `
+    <div>
+      ${labitPageHeader('일정 및 활동', '동아리의 모임과 주요 일정을 관리합니다.', '＋ 일정 등록', 'labitOpenSchedule()')}
+      <div class="space-y-3">
+        ${schedules.length ? schedules.map(s => `
+          <div class="labit-card p-5">
+            <div class="flex flex-wrap justify-between gap-3">
+              <div class="min-w-0">
+                <div class="text-xs text-labit-primary font-bold mb-2">${labitEscape(s.startDate || '날짜 미정')}${s.endDate ? ' ~ ' + labitEscape(s.endDate) : ''}</div>
+                <h3 class="font-bold text-labit-text">${labitEscape(s.title)}</h3>
+                <p class="text-sm text-slate-500 mt-2 whitespace-pre-wrap">${labitEscape(s.description || '')}</p>
+                ${s.location ? `<p class="text-xs text-slate-400 mt-2">장소: ${labitEscape(s.location)}</p>` : ''}
+              </div>
+              ${labitCanManage(s, 'createdById') ? `
+                <div class="flex gap-2">
+                  <button onclick="labitEditSchedule('${encodeURIComponent(s.id)}')" class="text-xs text-slate-500">수정</button>
+                  <button onclick="labitArchiveSchedule('${encodeURIComponent(s.id)}')" class="text-xs text-red-500">보관</button>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `).join('') : labitEmpty('등록된 일정이 없습니다.')}
+      </div>
+    </div>
+  `;
+}
+
+function labitOpenSchedule(id) {
+  const old = id ? window.LABIT.schedules.find(s => String(s.id) === String(id)) : {};
+  if (id && !old) return;
+
+  labitOpenForm(id ? '일정 수정' : '새 일정 등록', [
+    { name: 'title', label: '일정 제목', value: old.title, required: true },
+    { name: 'startDate', label: '시작 날짜', type: 'date', value: old.startDate, required: true },
+    { name: 'endDate', label: '종료 날짜', type: 'date', value: old.endDate },
+    { name: 'location', label: '장소', value: old.location },
+    { name: 'description', label: '상세 내용', type: 'textarea', value: old.description }
+  ], async data => {
+    const res = await API.post(id ? 'schedules/update' : 'schedules/create', {
+      ...data, ...(id ? { id } : {})
+    });
+    if (!res.success) throw new Error(res.message || '일정을 저장하지 못했습니다.');
+    labitCloseForm();
+    await renderSchedulesView(document.getElementById('app-content'));
+  });
+}
+
+function labitEditSchedule(id) {
+  labitOpenSchedule(decodeURIComponent(id));
+}
+
+async function labitArchiveSchedule(id) {
+  id = decodeURIComponent(id);
+  if (!confirm('이 일정을 보관할까요?')) return;
+  const res = await API.post('schedules/archive', { id });
+  if (!res.success) return alert(res.message || '보관에 실패했습니다.');
+  await renderSchedulesView(document.getElementById('app-content'));
+}
+
+
+// ==========================================
+// 2. 동아리원 관리
+// ==========================================
+
+async function renderMembersView(container) {
+  const user = Auth.getUser();
+
+  if (!user || user.role !== 'ADMIN') {
+    container.innerHTML = labitEmpty('관리자만 동아리원 관리 화면에 접근할 수 있습니다.');
+    return;
+  }
+
+  container.innerHTML = '<div class="py-16 text-center text-slate-400">동아리원 정보를 불러오는 중...</div>';
+
+  const res = await API.post('members/list');
+  const members = res.success && Array.isArray(res.data) ? res.data : [];
+  window.LABIT.members = members;
+
+  container.innerHTML = `
+    <div>
+      ${labitPageHeader('동아리원 관리', '가입된 동아리원의 계정과 권한을 관리합니다.', '＋ 동아리원 초대', 'labitInviteMember()')}
+      <div class="labit-card overflow-hidden">
+        ${members.length ? members.map(m => `
+          <div class="p-4 border-b border-slate-100 last:border-0 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-labit-primary font-bold">
+                ${labitEscape((m.name || '?').slice(0, 1))}
+              </div>
+              <div class="min-w-0">
+                <p class="font-bold text-sm text-labit-text">${labitEscape(m.name)}</p>
+                <p class="text-xs text-slate-400 truncate">${labitEscape(m.email)}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs px-2 py-1 rounded-lg ${m.role === 'ADMIN' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}">${m.role === 'ADMIN' ? '관리자' : '일반 회원'}</span>
+              <span class="text-xs ${m.status === 'ACTIVE' ? 'text-emerald-600' : 'text-red-500'}">${m.status === 'ACTIVE' ? '활성' : '비활성'}</span>
+              <button onclick="labitEditMember('${encodeURIComponent(m.id)}')" class="text-xs text-labit-primary font-bold">관리</button>
+            </div>
+          </div>
+        `).join('') : labitEmpty('등록된 동아리원이 없습니다.')}
+      </div>
+    </div>
+  `;
+}
+
+function labitInviteMember() {
+  labitOpenForm('동아리원 초대', [
+    { name: 'name', label: '이름', required: true },
+    { name: 'email', label: '학교 이메일', type: 'email', required: true },
+    { name: 'role', label: '권한', type: 'select', value: 'MEMBER', options: [
+      { value: 'MEMBER', label: '일반 회원' },
+      { value: 'ADMIN', label: '관리자' }
+    ]}
+  ], async data => {
+    const res = await API.post('members/invite', data);
+    if (!res.success) throw new Error(res.message || '초대에 실패했습니다.');
+    alert('초대가 등록되었습니다.');
+    labitCloseForm();
+    await renderMembersView(document.getElementById('app-content'));
+  });
+}
+
+function labitEditMember(id) {
+  id = decodeURIComponent(id);
+  const member = window.LABIT.members.find(m => String(m.id) === String(id));
+  if (!member) return;
+
+  labitOpenForm('동아리원 정보 변경', [
+    { name: 'role', label: '권한', type: 'select', value: member.role, options: [
+      { value: 'MEMBER', label: '일반 회원' },
+      { value: 'ADMIN', label: '관리자' }
+    ]},
+    { name: 'status', label: '계정 상태', type: 'select', value: member.status, options: [
+      { value: 'ACTIVE', label: '활성' },
+      { value: 'INACTIVE', label: '비활성' }
+    ]}
+  ], async data => {
+    const res = await API.post('members/update', { id, ...data });
+    if (!res.success) throw new Error(res.message || '회원 정보를 변경하지 못했습니다.');
+    labitCloseForm();
+    await renderMembersView(document.getElementById('app-content'));
+  });
+}
+
+
+// ==========================================
+// 3. 활동 아카이브
+// ==========================================
+
+async function renderArchiveView(container) {
+  container.innerHTML = '<div class="py-16 text-center text-slate-400">활동 기록을 불러오는 중...</div>';
+
+  const res = await API.post('archive/list');
+  const data = res.success && res.data ? res.data : {};
+  const activities = data.activities || [];
+  const experiments = data.completedExperiments || [];
+
+  container.innerHTML = `
+    <div>
+      ${labitPageHeader('활동 아카이브', '완료된 실험과 동아리 활동을 모아 봅니다.', '＋ 활동 기록', 'labitOpenActivity()')}
+
+      <section class="mb-8">
+        <h3 class="font-bold text-labit-text mb-3">완료된 실험</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          ${experiments.length ? experiments.map(e => `
+            <div class="labit-card p-4">
+              <span class="text-xs text-emerald-600 font-bold">실험 완료</span>
+              <h4 class="font-bold mt-2">${labitEscape(e.title)}</h4>
+              <p class="text-xs text-slate-400 mt-2">${labitEscape(e.category || '기타')}</p>
+              <button onclick="navigateTo('experiments')" class="text-xs text-labit-primary mt-3">실험 관리에서 보기 →</button>
+            </div>
+          `).join('') : labitEmpty('완료된 실험이 없습니다.')}
+        </div>
+      </section>
+
+      <section>
+        <h3 class="font-bold text-labit-text mb-3">동아리 활동 기록</h3>
+        <div class="space-y-3">
+          ${activities.length ? activities.map(a => `
+            <div class="labit-card p-5">
+              <div class="flex justify-between gap-3">
+                <div>
+                  <p class="text-xs text-labit-primary font-bold">${labitEscape(a.activityDate || '날짜 미정')}</p>
+                  <h4 class="font-bold mt-2">${labitEscape(a.title)}</h4>
+                  <p class="text-sm text-slate-500 mt-2 whitespace-pre-wrap">${labitEscape(a.description || '')}</p>
+                  <p class="text-xs text-slate-400 mt-2">참여 인원 ${Number(a.memberCount) || 0}명</p>
+                </div>
+                ${labitCanManage(a, 'authorId') ? `
+                  <div class="flex gap-2 shrink-0">
+                    <button onclick="labitEditActivity('${encodeURIComponent(a.id)}')" class="text-xs text-slate-500">수정</button>
+                    <button onclick="labitArchiveActivity('${encodeURIComponent(a.id)}')" class="text-xs text-red-500">보관</button>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `).join('') : labitEmpty('등록된 활동 기록이 없습니다.')}
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+function labitOpenActivity(id) {
+  const old = id ? (window.LABIT.activities || []).find(a => String(a.id) === String(id)) : {};
+  labitOpenForm(id ? '활동 기록 수정' : '새 활동 기록', [
+    { name: 'title', label: '활동 제목', value: old.title, required: true },
+    { name: 'activityDate', label: '활동 날짜', type: 'date', value: old.activityDate },
+    { name: 'memberCount', label: '참여 인원', type: 'number', value: old.memberCount || 0 },
+    { name: 'description', label: '활동 내용', type: 'textarea', value: old.description }
+  ], async data => {
+    const res = await API.post(id ? 'activities/update' : 'activities/create', {
+      ...data, ...(id ? { id } : {})
+    });
+    if (!res.success) throw new Error(res.message || '활동 기록을 저장하지 못했습니다.');
+    labitCloseForm();
+    await renderArchiveView(document.getElementById('app-content'));
+  });
+}
+
+async function labitEditActivity(id) {
+  id = decodeURIComponent(id);
+  const res = await API.post('activities/list');
+  window.LABIT.activities = res.success ? res.data || [] : [];
+  labitOpenActivity(id);
+}
+
+async function labitArchiveActivity(id) {
+  id = decodeURIComponent(id);
+  if (!confirm('이 활동 기록을 보관할까요?')) return;
+  const res = await API.post('activities/archive', { id });
+  if (!res.success) return alert(res.message || '보관에 실패했습니다.');
+  await renderArchiveView(document.getElementById('app-content'));
+}
+
+
+// ==========================================
+// 4. 공지 및 커뮤니티
+// ==========================================
+
+async function renderCommunityView(container) {
+  container.innerHTML = '<div class="py-16 text-center text-slate-400">게시글을 불러오는 중...</div>';
+
+  const res = await API.post('community/list');
+  const posts = res.success && Array.isArray(res.data) ? res.data : [];
+  window.LABIT.posts = posts;
+
+  container.innerHTML = `
+    <div>
+      ${labitPageHeader('공지 및 커뮤니티', '동아리 공지사항과 자유로운 의견을 나눕니다.', '＋ 글쓰기', 'labitOpenPost()')}
+      <div class="space-y-3">
+        ${posts.length ? posts.map(p => `
+          <button onclick="labitOpenPostDetail('${encodeURIComponent(p.id)}')" class="labit-card p-5 w-full text-left hover:border-emerald-200">
+            <div class="flex justify-between gap-3">
+              <div class="min-w-0">
+                <span class="text-xs text-labit-primary font-bold">${labitEscape(p.category || '자유')}</span>
+                <h3 class="font-bold text-labit-text mt-2 truncate">${labitEscape(p.title)}</h3>
+                <p class="text-xs text-slate-400 mt-2">${labitEscape(p.authorName || '동아리원')} · ${labitEscape(String(p.createdAt || '').slice(0, 10))}</p>
+              </div>
+              <i data-lucide="chevron-right" class="w-5 h-5 text-slate-300 shrink-0"></i>
+            </div>
+          </button>
+        `).join('') : labitEmpty('등록된 게시글이 없습니다.')}
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function labitOpenPost(id) {
+  const old = id ? window.LABIT.posts.find(p => String(p.id) === String(id)) : {};
+
+  labitOpenForm(id ? '게시글 수정' : '새 게시글 작성', [
+    { name: 'title', label: '제목', value: old.title, required: true },
+    { name: 'category', label: '분류', type: 'select', value: old.category || '자유', options: [
+      { value: '공지', label: '공지' },
+      { value: '자유', label: '자유' },
+      { value: '질문', label: '질문' },
+      { value: '활동', label: '활동' }
+    ]},
+    { name: 'content', label: '내용', type: 'textarea', value: old.content, required: true, maxlength: 10000 }
+  ], async data => {
+    const res = await API.post(id ? 'community/update' : 'community/create', {
+      ...data, ...(id ? { id } : {})
+    });
+    if (!res.success) throw new Error(res.message || '게시글을 저장하지 못했습니다.');
+    labitCloseForm();
+    await renderCommunityView(document.getElementById('app-content'));
+  });
+}
+
+async function labitOpenPostDetail(id) {
+  id = decodeURIComponent(id);
+  const res = await API.post('community/get', { id });
+  if (!res.success) return alert(res.message || '게시글을 불러오지 못했습니다.');
+
+  const { post, comments } = res.data;
+  const user = Auth.getUser();
+  const canEdit = user && (
+    user.role === 'ADMIN' || String(user.id) === String(post.authorId)
+  );
+
+  document.getElementById('labit-post-detail')?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'labit-post-detail';
+  modal.className = 'fixed inset-0 z-[100] bg-slate-950/50 flex items-center justify-center p-3';
+
+  modal.innerHTML = `
+    <div class="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl">
+      <div class="p-5 border-b flex justify-between gap-3">
+        <div>
+          <span class="text-xs text-labit-primary font-bold">${labitEscape(post.category || '자유')}</span>
+          <h3 class="font-bold text-lg mt-2">${labitEscape(post.title)}</h3>
+          <p class="text-xs text-slate-400 mt-2">${labitEscape(post.authorName || '동아리원')} · ${labitEscape(String(post.createdAt || '').slice(0, 10))}</p>
+        </div>
+        <button onclick="document.getElementById('labit-post-detail')?.remove()" class="text-slate-400 p-2"><i data-lucide="x"></i></button>
+      </div>
+      <div class="p-5">
+        <p class="text-sm leading-relaxed whitespace-pre-wrap text-slate-700">${labitEscape(post.content)}</p>
+
+        ${canEdit ? `
+          <div class="flex gap-2 mt-5">
+            <button onclick="document.getElementById('labit-post-detail')?.remove();labitOpenPost('${encodeURIComponent(post.id)}')" class="text-xs bg-slate-100 rounded-lg px-3 py-2">수정</button>
+            <button onclick="labitArchivePost('${encodeURIComponent(post.id)}')" class="text-xs bg-red-50 text-red-600 rounded-lg px-3 py-2">보관</button>
+          </div>
+        ` : ''}
+
+        <div class="border-t mt-6 pt-5">
+          <h4 class="font-bold text-sm mb-3">댓글 ${comments.length}개</h4>
+          <div class="space-y-3">
+            ${comments.map(c => `
+              <div class="bg-slate-50 p-3 rounded-xl">
+                <p class="text-xs font-bold">${labitEscape(c.authorName || '동아리원')}</p>
+                <p class="text-sm mt-2 whitespace-pre-wrap">${labitEscape(c.content)}</p>
+                ${user && (user.role === 'ADMIN' || String(user.id) === String(c.authorId)) ? `<button onclick="labitArchivePostComment('${encodeURIComponent(c.id)}','${encodeURIComponent(post.id)}')" class="text-xs text-red-500 mt-2">댓글 삭제</button>` : ''}
+              </div>
+            `).join('') || '<p class="text-xs text-slate-400">아직 댓글이 없습니다.</p>'}
+          </div>
+          <form onsubmit="labitSubmitPostComment(event,'${encodeURIComponent(post.id)}')" class="flex gap-2 mt-4">
+            <input name="content" maxlength="3000" required placeholder="댓글을 입력하세요." class="flex-1 min-w-0 border rounded-xl px-3 py-2 text-sm">
+            <button class="bg-labit-primary text-white rounded-xl px-4 text-sm font-bold">등록</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => {
+    if (e.target === modal) modal.remove();
+  });
+  if (window.lucide) lucide.createIcons();
+}
+
+async function labitSubmitPostComment(event, id) {
+  event.preventDefault();
+  id = decodeURIComponent(id);
+  const content = new FormData(event.target).get('content');
+  const res = await API.post('community/addComment', { postId: id, content });
+  if (!res.success) return alert(res.message || '댓글을 등록하지 못했습니다.');
+  await labitOpenPostDetail(encodeURIComponent(id));
+}
+
+async function labitArchivePost(id) {
+  id = decodeURIComponent(id);
+  if (!confirm('게시글을 보관할까요?')) return;
+  const res = await API.post('community/archive', { id });
+  if (!res.success) return alert(res.message || '게시글을 보관하지 못했습니다.');
+  document.getElementById('labit-post-detail')?.remove();
+  await renderCommunityView(document.getElementById('app-content'));
+}
+
+async function labitArchivePostComment(commentId, postId) {
+  commentId = decodeURIComponent(commentId);
+  postId = decodeURIComponent(postId);
+  if (!confirm('댓글을 삭제할까요?')) return;
+  const res = await API.post('community/archiveComment', { id: commentId });
+  if (!res.success) return alert(res.message || '댓글을 삭제하지 못했습니다.');
+  await labitOpenPostDetail(encodeURIComponent(postId));
+}
 
 function getPlaceholderViewHTML(menuItem) {
   return `

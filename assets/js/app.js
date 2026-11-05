@@ -438,6 +438,8 @@ function renderView(menuItem) {
     renderDashboardView(contentEl);
   } else if (menuItem.id === 'experiments') {
     renderExperimentsView(contentEl);
+  } else if (menuItem.id === 'materials') {
+    renderMaterialsView(contentEl);
   } else if (menuItem.id === 'admin') {
     contentEl.innerHTML = getAdminTestViewHTML();
   } else {
@@ -1266,6 +1268,281 @@ function saveAdminSettings() {
   renderSidebarNav();
   alert('설정이 정상 저장되었습니다.');
 }
+
+
+// ==========================================
+// 연구 자료실
+// ==========================================
+let materialsDataCache = [];
+
+function materialEscape(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+function materialTypeLabel(type) {
+  return ({ PAPER: '논문', ARTICLE: '기사', BOOK: '도서', REPORT: '보고서', ETC: '기타' })[type] || type || '기타';
+}
+
+async function renderMaterialsView(container) {
+  container.innerHTML = `
+    <div class="space-y-5">
+      <div class="labit-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-bold text-labit-text">연구 자료실</h3>
+          <p class="text-xs text-labit-subtext mt-1">논문, 기사, 도서 등 동아리 연구에 참고한 자료를 모아 관리합니다.</p>
+        </div>
+        <button onclick="openMaterialModal()" class="px-4 py-2.5 bg-labit-primary hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-2">
+          <i data-lucide="plus" class="w-4 h-4"></i><span>자료 등록</span>
+        </button>
+      </div>
+
+      <div class="flex flex-col md:flex-row gap-3">
+        <div class="relative flex-1">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+          <input id="material-search" oninput="filterMaterials()" placeholder="제목, 저자, 출처, 키워드 검색" class="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-labit-primary">
+        </div>
+        <select id="material-type-filter" onchange="filterMaterials()" class="px-3 py-2.5 text-xs bg-white border border-slate-200 rounded-xl">
+          <option value="ALL">모든 자료 유형</option><option value="PAPER">논문</option><option value="ARTICLE">기사</option><option value="BOOK">도서</option><option value="REPORT">보고서</option><option value="ETC">기타</option>
+        </select>
+        <select id="material-category-filter" onchange="filterMaterials()" class="px-3 py-2.5 text-xs bg-white border border-slate-200 rounded-xl">
+          <option value="ALL">모든 분야</option><option>생명과학</option><option>의학</option><option>생명윤리</option><option>화학</option><option>인공지능</option><option>기타</option>
+        </select>
+        <label class="flex items-center gap-2 px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600">
+          <input id="material-favorites-only" type="checkbox" onchange="filterMaterials()" class="accent-emerald-600"> 즐겨찾기만
+        </label>
+      </div>
+      <div id="materials-list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div class="col-span-full text-center py-12 text-sm text-slate-400">자료를 불러오는 중입니다...</div>
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+  await loadMaterials();
+}
+
+async function loadMaterials() {
+  const target = document.getElementById('materials-list');
+  if (!target) return;
+  const res = await API.post('materials/list');
+  if (!res.success) {
+    target.innerHTML = `<div class="col-span-full labit-card p-8 text-center text-sm text-red-500">${materialEscape(res.message || '자료를 불러오지 못했습니다.')}</div>`;
+    return;
+  }
+  materialsDataCache = Array.isArray(res.data) ? res.data : [];
+  filterMaterials();
+}
+
+function filterMaterials() {
+  const target = document.getElementById('materials-list');
+  if (!target) return;
+  const q = (document.getElementById('material-search')?.value || '').trim().toLowerCase();
+  const type = document.getElementById('material-type-filter')?.value || 'ALL';
+  const category = document.getElementById('material-category-filter')?.value || 'ALL';
+  const favoritesOnly = !!document.getElementById('material-favorites-only')?.checked;
+  const filtered = materialsDataCache.filter(m => {
+    const haystack = [m.title, m.authors, m.source, m.summary, m.category, m.doi].join(' ').toLowerCase();
+    return (!q || haystack.includes(q)) &&
+      (type === 'ALL' || m.type === type) &&
+      (category === 'ALL' || m.category === category) &&
+      (!favoritesOnly || m.isFavorite);
+  });
+  if (!filtered.length) {
+    target.innerHTML = `<div class="col-span-full labit-card p-10 text-center"><i data-lucide="book-open" class="w-8 h-8 text-slate-300 mx-auto mb-3"></i><p class="text-sm font-bold text-labit-text">조건에 맞는 자료가 없습니다.</p><p class="text-xs text-labit-subtext mt-1">검색 조건을 바꾸거나 새 자료를 등록해 보세요.</p></div>`;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+  const user = Auth.getUser();
+  target.innerHTML = filtered.map(m => {
+    const canEdit = user && (user.role === 'ADMIN' || String(user.id) === String(m.authorId));
+    const title = materialEscape(m.title);
+    return `
+      <article class="labit-card p-5 flex flex-col min-h-[230px]">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="px-2 py-1 rounded-lg bg-emerald-50 text-labit-primary text-[10px] font-bold">${materialEscape(materialTypeLabel(m.type))}</span>
+            <span class="text-[10px] text-slate-500 truncate">${materialEscape(m.category || '기타')}</span>
+          </div>
+          <button onclick="toggleMaterialFavorite('${materialEscape(m.id)}')" aria-label="즐겨찾기" class="p-1.5 rounded-lg hover:bg-amber-50 ${m.isFavorite ? 'text-amber-500' : 'text-slate-300'}"><i data-lucide="star" class="w-4 h-4" ${m.isFavorite ? 'fill="currentColor"' : ''}></i></button>
+        </div>
+        <button onclick="openMaterialDetail('${materialEscape(m.id)}')" class="text-left mt-4">
+          <h4 class="font-bold text-labit-text leading-snug line-clamp-2">${title}</h4>
+          <p class="text-xs text-slate-500 mt-2">${materialEscape(m.authors || '저자 정보 없음')}${m.source ? ' · ' + materialEscape(m.source) : ''}</p>
+          <p class="text-xs text-labit-subtext mt-3 leading-relaxed line-clamp-3">${materialEscape(m.summary || m.content || m.selectionReason || '요약 내용이 등록되지 않았습니다.')}</p>
+        </button>
+        <div class="mt-auto pt-4 flex items-center justify-between gap-2">
+          <span class="text-[10px] text-slate-400">${materialEscape(m.authorName || '동아리원')}</span>
+          <div class="flex items-center gap-2">
+            ${m.url ? `<a href="${materialEscape(m.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" class="text-[10px] font-bold text-labit-primary hover:underline">원문 보기</a>` : ''}
+            <button onclick="openMaterialDetail('${materialEscape(m.id)}')" class="text-[10px] font-bold text-slate-500 hover:text-labit-primary">상세 보기</button>
+            ${canEdit ? `<button onclick="openMaterialModal('${materialEscape(m.id)}')" class="text-[10px] font-bold text-slate-500 hover:text-labit-primary">수정</button>` : ''}
+          </div>
+        </div>
+      </article>`;
+  }).join('');
+  if (window.lucide) lucide.createIcons();
+}
+
+async function toggleMaterialFavorite(id) {
+  const res = await API.post('materials/toggleFavorite', { id });
+  if (!res.success) { alert(res.message || '즐겨찾기를 변경하지 못했습니다.'); return; }
+  const item = materialsDataCache.find(m => String(m.id) === String(id));
+  if (item) item.isFavorite = !!res.data.isFavorite;
+  filterMaterials();
+}
+
+async function openMaterialModal(id = '') {
+  const old = id ? await API.post('materials/get', { id }) : null;
+  if (id && (!old || !old.success)) { alert(old?.message || '자료를 불러오지 못했습니다.'); return; }
+  const material = old?.data?.material || {};
+  const expRes = await API.post('experiments/list');
+  const experiments = expRes.success && Array.isArray(expRes.data) ? expRes.data : [];
+  const overlay = document.createElement('div');
+  overlay.id = 'material-edit-modal';
+  overlay.className = 'fixed inset-0 z-[100] bg-slate-950/50 flex items-center justify-center p-3 sm:p-6';
+  overlay.innerHTML = `
+    <div class="bg-white w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+        <div><h3 class="font-bold text-lg text-labit-text">${id ? '연구 자료 수정' : '새 연구 자료 등록'}</h3><p class="text-xs text-slate-500 mt-1">자료 정보를 입력해 주세요.</p></div>
+        <button onclick="document.getElementById('material-edit-modal').remove()" class="p-2 text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form id="material-edit-form" class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <label class="sm:col-span-2 text-xs font-semibold text-slate-600">자료 제목 *
+          <input name="title" required maxlength="200" value="${materialEscape(material.title || '')}" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+        </label>
+        <label class="text-xs font-semibold text-slate-600">자료 유형
+          <select name="type" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+            ${[['PAPER','논문'],['ARTICLE','기사'],['BOOK','도서'],['REPORT','보고서'],['ETC','기타']].map(([v,l])=>`<option value="${v}" ${material.type===v?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </label>
+        <label class="text-xs font-semibold text-slate-600">분야
+          <select name="category" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+            ${['생명과학','의학','생명윤리','화학','인공지능','기타'].map(v=>`<option ${material.category===v?'selected':''}>${v}</option>`).join('')}
+          </select>
+        </label>
+        <label class="text-xs font-semibold text-slate-600">저자
+          <input name="authors" value="${materialEscape(material.authors || '')}" placeholder="저자명" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+        </label>
+        <label class="text-xs font-semibold text-slate-600">출처 / 발행처
+          <input name="source" value="${materialEscape(material.source || '')}" placeholder="학술지, 언론사, 출판사 등" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+        </label>
+        <label class="sm:col-span-2 text-xs font-semibold text-slate-600">자료 원문 링크
+          <input name="url" type="url" value="${materialEscape(material.url || '')}" placeholder="https://" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+        </label>
+        <label class="sm:col-span-2 text-xs font-semibold text-slate-600">DOI
+          <input name="doi" value="${materialEscape(material.doi || '')}" placeholder="10.xxxx/xxxxx" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+        </label>
+        <label class="sm:col-span-2 text-xs font-semibold text-slate-600">요약
+          <textarea name="summary" rows="3" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">${materialEscape(material.summary || '')}</textarea>
+        </label>
+        <label class="sm:col-span-2 text-xs font-semibold text-slate-600">자료를 선정한 이유 / 활용 계획
+          <textarea name="selectionReason" rows="3" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">${materialEscape(material.selectionReason || '')}</textarea>
+        </label>
+        <label class="sm:col-span-2 text-xs font-semibold text-slate-600">Google Drive 첨부 링크
+          <input name="fileUrl" type="url" value="${materialEscape(material.fileUrl || '')}" placeholder="Drive 공유 링크(https://...)" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+          <span class="block mt-1 text-[10px] text-slate-400">파일을 Drive에 올린 뒤, 동아리원이 열람할 수 있는 공유 링크를 붙여 넣으세요.</span>
+        </label>
+        <label class="sm:col-span-2 text-xs font-semibold text-slate-600">연결할 실험
+          <select name="relatedExperimentId" class="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm">
+            <option value="">연결하지 않음</option>
+            ${experiments.map(e=>`<option value="${materialEscape(e.id)}" ${String(material.relatedExperimentId||'')===String(e.id)?'selected':''}>${materialEscape(e.title)}</option>`).join('')}
+          </select>
+        </label>
+        <div class="sm:col-span-2 flex justify-end gap-2 pt-2">
+          <button type="button" onclick="document.getElementById('material-edit-modal').remove()" class="px-4 py-2.5 text-xs font-bold text-slate-500 bg-slate-100 rounded-xl">취소</button>
+          <button type="submit" class="px-5 py-2.5 text-xs font-bold text-white bg-labit-primary rounded-xl">${id ? '수정 내용 저장' : '자료 등록'}</button>
+        </div>
+      </form>
+    </div>`;
+  document.body.appendChild(overlay);
+  if (window.lucide) lucide.createIcons();
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.getElementById('material-edit-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const data = Object.fromEntries(form.entries());
+    data.id = id;
+    const result = await API.post(id ? 'materials/update' : 'materials/create', data);
+    if (!result.success) { alert(result.message || '저장하지 못했습니다.'); return; }
+    overlay.remove();
+    await loadMaterials();
+  });
+}
+
+async function openMaterialDetail(id) {
+  const res = await API.post('materials/get', { id });
+  if (!res.success) { alert(res.message || '자료를 불러오지 못했습니다.'); return; }
+  const { material: m, comments } = res.data;
+  const user = Auth.getUser();
+  const canEdit = user && (user.role === 'ADMIN' || String(user.id) === String(m.authorId));
+  const modal = document.createElement('div');
+  modal.id = 'material-detail-modal';
+  modal.className = 'fixed inset-0 z-[100] bg-slate-950/50 flex items-center justify-center p-3 sm:p-6';
+  modal.innerHTML = `
+    <div class="bg-white w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl">
+      <div class="p-5 border-b border-slate-100 flex justify-between items-start gap-3">
+        <div><div class="flex gap-2 mb-2"><span class="px-2 py-1 rounded-lg bg-emerald-50 text-labit-primary text-[10px] font-bold">${materialEscape(materialTypeLabel(m.type))}</span><span class="text-[10px] text-slate-500">${materialEscape(m.category || '기타')}</span></div><h3 class="text-lg font-bold text-labit-text">${materialEscape(m.title)}</h3><p class="text-xs text-slate-500 mt-2">${materialEscape(m.authors || '저자 정보 없음')} · ${materialEscape(m.source || '출처 정보 없음')}</p></div>
+        <button onclick="document.getElementById('material-detail-modal').remove()" class="p-2 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="p-5 space-y-5">
+        ${(m.summary || m.content) ? `<section><h4 class="text-xs font-bold text-slate-500 mb-2">자료 요약 / 내용</h4><p class="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">${materialEscape(m.summary || m.content)}</p></section>` : ''}
+        ${m.selectionReason ? `<section><h4 class="text-xs font-bold text-slate-500 mb-2">선정 이유 및 활용 계획</h4><p class="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">${materialEscape(m.selectionReason)}</p></section>` : ''}
+        <section class="space-y-2 text-xs">
+          ${m.doi ? `<p><b class="text-slate-500">DOI</b> <span class="text-slate-700">${materialEscape(m.doi)}</span></p>` : ''}
+          ${m.url ? `<p><b class="text-slate-500">원문</b> <a href="${materialEscape(m.url)}" target="_blank" rel="noopener noreferrer" class="text-labit-primary underline break-all">자료 링크 열기</a></p>` : ''}
+          ${m.fileUrl ? `<p><b class="text-slate-500">첨부</b> <a href="${materialEscape(m.fileUrl)}" target="_blank" rel="noopener noreferrer" class="text-labit-primary underline">Google Drive 파일 열기</a></p>` : ''}
+          ${m.relatedExperimentId ? `<p><b class="text-slate-500">연결 실험</b> <span class="text-slate-700">${materialEscape((experimentsDataCache.find(e=>String(e.id)===String(m.relatedExperimentId))||{}).title || '연결된 실험')}</span></p>` : ''}
+          <p class="text-slate-400">등록자: ${materialEscape(m.authorName || '동아리원')}</p>
+        </section>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="toggleMaterialFavorite('${materialEscape(m.id)}');document.getElementById('material-detail-modal')?.remove()" class="px-3 py-2 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold">${m.isFavorite ? '★ 즐겨찾기 해제' : '☆ 즐겨찾기'}</button>
+          ${canEdit ? `<button onclick="document.getElementById('material-detail-modal').remove();openMaterialModal('${materialEscape(m.id)}')" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-bold">수정</button><button onclick="archiveMaterial('${materialEscape(m.id)}')" class="px-3 py-2 rounded-lg bg-red-50 text-red-600 text-xs font-bold">보관</button>` : ''}
+        </div>
+        <section class="border-t border-slate-100 pt-4">
+          <h4 class="font-bold text-sm text-labit-text mb-3">댓글 ${comments.length}</h4>
+          <div class="space-y-3 mb-4">
+            ${comments.length ? comments.map(c => `<div class="bg-slate-50 rounded-xl p-3"><div class="flex justify-between gap-2"><b class="text-xs text-slate-700">${materialEscape(c.authorName || '동아리원')}</b><span class="text-[10px] text-slate-400">${materialEscape(String(c.createdAt || '').slice(0,10))}</span></div><p class="text-xs text-slate-600 mt-2 whitespace-pre-wrap">${materialEscape(c.content)}</p>${user && (user.role==='ADMIN' || String(user.id)===String(c.authorId)) ? `<button onclick="archiveMaterialComment('${materialEscape(c.id)}','${materialEscape(m.id)}')" class="text-[10px] text-red-400 mt-2">댓글 삭제</button>` : ''}</div>`).join('') : '<p class="text-xs text-slate-400">아직 댓글이 없습니다.</p>'}
+          </div>
+          <form onsubmit="submitMaterialComment(event,'${materialEscape(m.id)}')" class="flex gap-2">
+            <input id="material-comment-input" maxlength="3000" required placeholder="자료에 대한 의견을 남겨 보세요." class="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2.5 text-xs">
+            <button class="px-4 py-2.5 bg-labit-primary text-white text-xs font-bold rounded-xl">등록</button>
+          </form>
+        </section>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  if (window.lucide) lucide.createIcons();
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+async function archiveMaterial(id) {
+  if (!confirm('이 자료를 보관할까요? 보관된 자료는 일반 목록에서 숨겨지며 시트의 기존 데이터는 삭제되지 않습니다.')) return;
+  const res = await API.post('materials/archive', { id });
+  if (!res.success) { alert(res.message || '보관하지 못했습니다.'); return; }
+  document.getElementById('material-detail-modal')?.remove();
+  await loadMaterials();
+}
+
+async function submitMaterialComment(event, materialId) {
+  event.preventDefault();
+  const input = document.getElementById('material-comment-input');
+  const content = input?.value.trim();
+  if (!content) return;
+  const res = await API.post('materials/addComment', { materialId, content });
+  if (!res.success) { alert(res.message || '댓글을 등록하지 못했습니다.'); return; }
+  document.getElementById('material-detail-modal')?.remove();
+  await openMaterialDetail(materialId);
+}
+
+async function archiveMaterialComment(id, materialId) {
+  if (!confirm('댓글을 삭제할까요?')) return;
+  const res = await API.post('materials/archiveComment', { id });
+  if (!res.success) { alert(res.message || '댓글을 삭제하지 못했습니다.'); return; }
+  document.getElementById('material-detail-modal')?.remove();
+  await openMaterialDetail(materialId);
+}
+
 
 function getPlaceholderViewHTML(menuItem) {
   return `

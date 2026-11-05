@@ -7,7 +7,7 @@ window.CONFIG = {
   ALLOWED_DOMAIN: 'yanggok.hs.kr',
   
   // GAS Web App 배포 URL
-  GAS_API_URL: 'https://script.google.com/macros/s/AKfycbz7ZJuU0MqWn_QCcTlFDhzfWTTBtjS7DSFnxqpTsgXwA1L7Z356GAkekMooxzQW_x0xOg/exec',
+  GAS_API_URL: 'https://script.google.com/macros/s/AKfycbyPxC57XyK0xgepxlqKFjol9z_lTvcVvcYivVqbBt42ADG1_vT_a82vheS-pgpQp0yyTQ/exec',
   
   // Google OAuth 2.0 Client ID
   GOOGLE_CLIENT_ID: '20979828869-0mbv7uonhcdu9ivdgntkcdg8k3hb4msr.apps.googleusercontent.com'
@@ -22,7 +22,7 @@ const CONFIG = window.CONFIG;
 window.MENU_ITEMS = [
   { id: 'dashboard', name: '대시보드', icon: 'layout-dashboard', implemented: true, minRole: 'MEMBER' },
   { id: 'experiments', name: '실험 관리', icon: 'flask-conical', implemented: true, minRole: 'MEMBER' },
-  { id: 'materials', name: '연구 자료실', icon: 'book-open', implemented: false, minRole: 'MEMBER' },
+  { id: 'materials', name: '연구 자료실', icon: 'book-open', implemented: true, minRole: 'MEMBER' },
   { id: 'schedules', name: '일정 및 활동', icon: 'calendar', implemented: false, minRole: 'MEMBER' },
   { id: 'members', name: '동아리원 관리', icon: 'users', implemented: false, minRole: 'ADMIN' },
   { id: 'archive', name: '활동 아카이브', icon: 'archive', implemented: false, minRole: 'MEMBER' },

@@ -1,0 +1,25 @@
+{
+  "name": "LABIT - 의생명과학 동아리",
+  "short_name": "LABIT",
+  "description": "고등학교 의생명과학 동아리 통합 관리 플랫폼",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F7F6",
+  "theme_color": "#279B78",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23279B78'/><text x='96' y='125' font-size='96' font-family='sans-serif' font-weight='bold' fill='white' text-anchor='middle'>L</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23279B78'/><text x='256' y='330' font-size='256' font-family='sans-serif' font-weight='bold' fill='white' text-anchor='middle'>L</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

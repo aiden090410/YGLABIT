@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LABIT - 의생명과학 동아리 통합 관리 플랫폼</title>
+  
+  <!-- PWA Meta Tags & Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#279B78">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="LABIT">
+
+  <!-- Pretendard Font CDN -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            labit: {
+              primary: '#279B78',
+              'primary-hover': '#1F7D61',
+              bg: '#F5F7F6',
+              text: '#25352F',
+              subtext: '#718078',
+              border: '#E3EAE6',
+              surface: '#FFFFFF'
+            }
+          },
+          fontFamily: {
+            sans: ['Pretendard', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Google Identity Services (GIS) SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  
+  <!-- Chart.js CDN (실험 데이터 그래프 시각화) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Custom Style -->
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="bg-labit-bg text-labit-text font-sans antialiased min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+
+  <!-- 오프라인 알림 상태 바 -->
+  <div id="network-status-bar" class="hidden fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-xs font-semibold py-1.5 px-4 text-center transition-all shadow-md">
+    <span class="inline-flex items-center space-x-1.5">
+      <i data-lucide="wifi-off" class="w-3.5 h-3.5"></i>
+      <span>현재 오프라인 상태입니다. 서버 저장 기능은 네트워크 연결 후 이용할 수 있습니다.</span>
+    </span>
+  </div>
+
+  <!-- PWA 업데이트 알림 토스트 -->
+  <div id="pwa-update-toast" class="hidden fixed bottom-20 md:bottom-6 right-6 z-50 bg-labit-text text-white p-4 rounded-xl shadow-2xl flex items-center space-x-4 border border-slate-700 animate-bounce">
+    <div class="text-sm">
+      <p class="font-bold">새로운 버전 업데이트 가능</p>
+      <p class="text-xs text-slate-300">최신 LABIT 기능이 준비되었습니다.</p>
+    </div>
+    <button id="pwa-update-btn" class="px-3 py-1.5 bg-labit-primary hover:bg-emerald-600 text-xs font-bold rounded-lg transition-colors">
+      새로고침
+    </button>
+  </div>
+
+  <!-- 데스크톱 사이드바 (md 이상 표시) -->
+  <aside id="desktop-sidebar" class="hidden md:flex flex-col w-64 bg-labit-surface border-r border-labit-border min-h-screen fixed left-0 top-0 bottom-0 z-30 shadow-sm">
+    <!-- 브랜드 로고 -->
+    <div class="h-16 flex items-center justify-between px-6 border-b border-labit-border">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-labit-primary to-emerald-600 flex items-center justify-center text-white font-bold text-lg shadow-md hover:scale-105 transition-transform cursor-pointer">
+          L
+        </div>
+        <div>
+          <h1 class="font-bold text-lg tracking-tight text-labit-text">LABIT</h1>
+          <p class="text-xs text-labit-subtext font-medium">Biomedical Science Club</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 네비게이션 메뉴 -->
+    <nav class="flex-1 py-4 px-3 space-y-1 overflow-y-auto" id="sidebar-nav">
+      <!-- JavaScript로 동적 생성됨 -->
+    </nav>
+
+    <!-- 사용자 프로필 카드 (사이드바 하단) -->
+    <div class="p-4 border-t border-labit-border bg-slate-50/50">
+      <div class="flex items-center space-x-3">
+        <div id="user-avatar-container" class="w-9 h-9 rounded-full bg-labit-primary/10 text-labit-primary flex items-center justify-center font-bold text-sm shadow-xs overflow-hidden border border-labit-border">
+          <span id="user-avatar-text">YG</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center space-x-1.5">
+            <p id="user-display-name" class="text-sm font-semibold text-labit-text truncate">게스트</p>
+            <span id="user-role-badge" class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-200 text-slate-600 uppercase">GUEST</span>
+          </div>
+          <p class="text-xs text-labit-subtext truncate" id="user-status-text">로그인이 필요합니다</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 메인 영역 Wrapper -->
+  <div class="flex-1 flex flex-col md:pl-64 min-h-screen pb-16 md:pb-0">
+    
+    <!-- 상단 헤더 -->
+    <header class="h-16 bg-labit-surface border-b border-labit-border flex items-center justify-between px-4 md:px-8 sticky top-0 z-20 shadow-xs">
+      <div class="flex items-center space-x-3">
+        <h2 id="page-title" class="text-xl font-bold text-labit-text tracking-tight">대시보드</h2>
+      </div>
+      
+      <div class="flex items-center space-x-3">
+        <!-- PWA 설치 버튼 -->
+        <button id="pwa-install-btn" class="hidden items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-labit-primary bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-all border border-emerald-200 shadow-xs">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>앱 설치</span>
+        </button>
+
+        <button class="p-2 text-labit-subtext hover:text-labit-primary hover:bg-labit-bg rounded-lg transition-colors relative" aria-label="알림">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+          <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+        </button>
+        <div class="h-4 w-[1px] bg-labit-border"></div>
+
+        <!-- 동적 인증 버튼 (로그인 / 로그아웃) -->
+        <div id="auth-btn-container">
+          <button id="auth-btn" class="px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-labit-primary to-emerald-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center space-x-1.5 cursor-pointer">
+            <i data-lucide="log-in" class="w-4 h-4"></i>
+            <span>로그인</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 동적 동아리 콘텐츠 바디 -->
+    <main id="app-content" class="flex-1 p-4 md:p-8 max-w-7xl w-full mx-auto">
+      <!-- JavaScript renderView()에 의해 콘텐츠 삽입됨 -->
+    </main>
+
+  </div>
+
+  <!-- 모바일 하단 네비게이션 -->
+  <nav id="mobile-bottom-nav" class="md:hidden fixed bottom-0 left-0 right-0 bg-labit-surface border-t border-labit-border z-40 px-2 py-1 flex justify-around items-center shadow-lg">
+    <!-- JavaScript로 동적 생성됨 -->
+  </nav>
+
+  <!-- Google 계정 로그인 팝업 모달 -->
+  <div id="login-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-300">
+    <div class="bg-white border border-slate-100 rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-6 relative transform transition-all scale-100">
+      <button id="modal-close-btn" class="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="text-center space-y-2">
+        <div class="w-14 h-14 bg-gradient-to-br from-emerald-50 to-teal-100 text-labit-primary rounded-2xl flex items-center justify-center mx-auto shadow-inner border border-emerald-100">
+          <i data-lucide="shield-check" class="w-7 h-7"></i>
+        </div>
+        <h3 class="text-xl font-bold text-labit-text">학교 계정 로그인</h3>
+        <p class="text-xs text-labit-subtext leading-relaxed">
+          양곡고등학교 Google Workspace 계정(<span class="font-semibold text-labit-primary">@yanggok.hs.kr</span>)으로 승인된 사용자만 접근할 수 있습니다.
+        </p>
+      </div>
+
+      <div class="flex flex-col items-center justify-center space-y-3 py-2">
+        <div id="g_id_onload_button"></div>
+        <p id="login-error-msg" class="hidden text-xs text-red-500 font-semibold text-center bg-red-50 p-3 rounded-xl border border-red-200 w-full shadow-xs"></p>
+      </div>
+
+      <div class="pt-4 border-t border-labit-border text-[11px] text-slate-400 text-center leading-normal">
+        <p>LABIT은 서버 측 Google ID 토큰 검증을 통해<br>사용자의 권한 및 보안 상태를 엄격하게 관리합니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 동적 팝업 모달 (실험 등록/수정/상세 전용 컨테이너) -->
+  <div id="experiment-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-300">
+    <!-- app.js에서 동적 생성됨 -->
+  </div>
+
+  <!-- JS 스크립트 로드 -->
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

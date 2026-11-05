@@ -1,0 +1,73 @@
+@charset "UTF-8";
+
+/* Pretendard 폰트 기본 서체 설정 */
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', sans-serif;
+  color: #25352F;
+  background-color: #F5F7F6;
+}
+
+/* 스크롤바 디자인 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F5F7F6;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* 메뉴 활성화 스타일 */
+.nav-item-active {
+  background-color: rgba(39, 155, 120, 0.1);
+  color: #279B78 !important;
+  font-weight: 700;
+}
+.nav-item-active i {
+  color: #279B78 !important;
+}
+
+/* 모바일 메뉴 아이템 활성화 */
+.mobile-nav-active {
+  color: #279B78 !important;
+  font-weight: 700;
+}
+.mobile-nav-active i {
+  color: #279B78 !important;
+}
+
+/* 카드 UI 상호작용 효과 */
+.labit-card {
+  background-color: #FFFFFF;
+  border: 1px solid #E3EAE6;
+  border-radius: 1rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.labit-card:hover {
+  border-color: #CBD5E1;
+  box-shadow: 0 10px 25px -5px rgba(37, 53, 47, 0.08);
+  transform: translateY(-2px);
+}
+
+/* 권한 배지 스타일 */
+.badge-admin {
+  background-color: #FEF3C7;
+  color: #D97706;
+  border: 1px solid #FCD34D;
+}
+.badge-member {
+  background-color: #D1FAE5;
+  color: #059669;
+  border: 1px solid #6EE7B7;
+}
+.badge-guest {
+  background-color: #F1F5F9;
+  color: #64748B;
+  border: 1px solid #E2E8F0;
+}

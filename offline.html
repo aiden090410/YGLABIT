@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LABIT - 오프라인 상태</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            labit: {
+              primary: '#279B78',
+              bg: '#F5F7F6',
+              text: '#25352F',
+              subtext: '#718078',
+              border: '#E3EAE6'
+            }
+          },
+          fontFamily: { sans: ['Pretendard', 'sans-serif'] }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-labit-bg text-labit-text font-sans min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white border border-labit-border p-8 rounded-2xl shadow-xl max-w-md w-full text-center space-y-5">
+    <div class="w-16 h-16 bg-emerald-50 text-labit-primary rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a5 5 0 010-7.072m-2.829 2.829L3 3m3.536 5.636a9 9 0 000 12.728" />
+      </svg>
+    </div>
+    
+    <div>
+      <h2 class="text-xl font-bold text-labit-text">오프라인 상태입니다</h2>
+      <p class="text-sm text-labit-subtext mt-2 leading-relaxed">
+        인터넷 연결이 끊어져 새 데이터를 불러올 수 없습니다.<br>
+        네트워크 연결을 확인한 뒤 다시 시도해 주세요.
+      </p>
+    </div>
+
+    <button onclick="window.location.reload()" class="w-full py-3 bg-labit-primary hover:bg-emerald-700 text-white font-semibold rounded-xl shadow-md transition-all">
+      다시 연결 시도
+    </button>
+  </div>
+</body>
+</html>

@@ -944,9 +944,9 @@ function renderExperimentChart() {
   if (!canvas || !experimentDetailCache) return;
 
   const dataList = experimentDetailCache.data || [];
-  const labels = dataList.map((d, i) => d.fileName || `Point ${i + 1}`);
-  const values = dataList.map(d => Number(d.fileSize || d.contentValue || 0));
-
+  const labels = dataList.map((d, i) =>
+  d.label || d.fileName || `Point ${i + 1}`);
+  const values = dataList.map(d => Number(d.numericValue ?? 0));
   if (currentChartInstance) {
     currentChartInstance.destroy();
   }
@@ -1110,15 +1110,27 @@ function openExperimentModal(mode, expId = null) {
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block font-bold text-labit-text mb-1">담당자</label>
-            <input type="text" id="form-exp-author" value="${exp.leadAuthorId}" placeholder="담당 학생 이름" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-labit-primary">
-          </div>
-          <div>
-            <label class="block font-bold text-labit-text mb-1">시작일</label>
-            <input type="date" id="form-exp-startdate" value="${exp.startDate}" class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-labit-primary">
-          </div>
+<div class="grid grid-cols-2 gap-3">
+  <div>
+    <label class="block font-bold text-labit-text mb-1">담당자</label>
+    <input type="text" id="form-exp-author"
+      value="${exp.leadAuthorId || ''}"
+      placeholder="담당 학생 이름"
+      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl">
+  </div>
+  <div>
+    <label class="block font-bold text-labit-text mb-1">시작일</label>
+    <input type="date" id="form-exp-startdate"
+      value="${exp.startDate || ''}"
+      class="w-full px-3.5 py-2 border border-slate-300 rounded-xl">
+  </div>
+</div>
+
+        <div>
+          <label class="block font-bold text-labit-text mb-1">종료일</label>
+          <input type="date" id="form-exp-enddate"
+            value="${exp.endDate || ''}"
+            class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-labit-primary">
         </div>
 
         <div>
@@ -1139,6 +1151,13 @@ function openExperimentModal(mode, expId = null) {
         <div>
           <label class="block font-bold text-labit-text mb-1">실험 프로토콜 (방법)</label>
           <textarea id="form-exp-method" rows="3" placeholder="1. 멸균 작업... 2. 배양기 작동..." class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-labit-primary">${exp.method || ''}</textarea>
+        </div>
+
+        <div>
+          <label class="block font-bold text-labit-text mb-1">실험 결과 및 결론</label>
+          <textarea id="form-exp-result" rows="3"
+            placeholder="실험 결과와 분석 및 결론을 기록하세요."
+            class="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-labit-primary">${exp.result || ''}</textarea>
         </div>
 
         <div class="pt-2">
@@ -1166,24 +1185,40 @@ function closeExperimentModal() {
 async function saveExperiment(e, mode, expId) {
   e.preventDefault();
 
-  const expData = {
-    id: mode === 'edit' ? expId : undefined,
-    title: document.getElementById('form-exp-title').value.trim(),
-    category: document.getElementById('form-exp-category').value,
-    status: document.getElementById('form-exp-status').value,
-    leadAuthorId: document.getElementById('form-exp-author').value.trim(),
-    startDate: document.getElementById('form-exp-startdate').value,
-    description: document.getElementById('form-exp-desc').value.trim(),
-    hypothesis: document.getElementById('form-exp-hypo').value.trim(),
-    materials: document.getElementById('form-exp-materials').value.trim(),
-    method: document.getElementById('form-exp-method').value.trim()
+  const getValue = id => {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
   };
 
+  const expData = {
+    id: mode === 'edit' ? expId : undefined,
+    title: getValue('form-exp-title'),
+    category: getValue('form-exp-category'),
+    status: getValue('form-exp-status'),
+    leadAuthorId: getValue('form-exp-author'),
+    startDate: getValue('form-exp-startdate'),
+    endDate: getValue('form-exp-enddate'),
+    description: getValue('form-exp-desc'),
+    hypothesis: getValue('form-exp-hypo'),
+    materials: getValue('form-exp-materials'),
+    method: getValue('form-exp-method'),
+    result: getValue('form-exp-result')
+  };
+
+  if (!expData.title) {
+    alert('실험 제목을 입력해 주세요.');
+    return;
+  }
+
   try {
-    const action = mode === 'create' ? 'experiments/create' : 'experiments/update';
+    const action = mode === 'create'
+      ? 'experiments/create'
+      : 'experiments/update';
+
     const res = await API.post(action, expData);
 
     if (res.success) {
+      alert(mode === 'create' ? '실험이 등록되었습니다.' : '실험 정보가 수정되었습니다.');
       closeExperimentModal();
       await loadExperimentsList();
     } else {

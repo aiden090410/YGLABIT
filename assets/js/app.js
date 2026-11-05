@@ -435,21 +435,32 @@ function navigateTo(menuId) {
   if (window.lucide) lucide.createIcons();
 }
 
+
 function renderView(menuItem) {
   const contentEl = document.getElementById('app-content');
   if (!contentEl) return;
 
-  if (menuItem.id === 'dashboard') {
-    renderDashboardView(contentEl);
-  } else if (menuItem.id === 'experiments') {
-    renderExperimentsView(contentEl);
-  } else if (menuItem.id === 'materials') {
-    renderMaterialsView(contentEl);
+  const viewMap = {
+    dashboard: renderDashboardView,
+    experiments: renderExperimentsView,
+    materials: renderMaterialsView,
+    schedules: renderSchedulesView,
+    members: renderMembersView,
+    archive: renderArchiveView,
+    community: renderCommunityView
+  };
+
+  const renderFunction = viewMap[menuItem.id];
+
+  if (typeof renderFunction === 'function') {
+    renderFunction(contentEl);
   } else if (menuItem.id === 'admin') {
     contentEl.innerHTML = getAdminTestViewHTML();
   } else {
     contentEl.innerHTML = getPlaceholderViewHTML(menuItem);
   }
+
+  if (window.lucide) lucide.createIcons();
 }
 
 

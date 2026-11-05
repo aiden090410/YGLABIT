@@ -3,7 +3,7 @@
  * 상대 경로 기반 캐스케이딩 캐싱 & 오프라인 지원
  */
 
-const CACHE_NAME = 'labit-static-v2';
+const CACHE_NAME = 'labit-static-v3';
 const OFFLINE_URL = './offline.html';
 
 // 캐싱할 정적 파일 목록 (상대 경로 적용)

@@ -7,7 +7,7 @@ window.CONFIG = {
   ALLOWED_DOMAIN: 'yanggok.hs.kr',
   
   // GAS Web App 배포 URL
-  GAS_API_URL: 'https://script.google.com/macros/s/AKfycbxcVhiUGji0Axvudi01mHd9pcZwhtTZZe2avdXakrcYuJSPv1R5PdytWmv5aNCIYH4uQA/exec',
+  GAS_API_URL: 'https://script.google.com/macros/s/AKfycbz7ZJuU0MqWn_QCcTlFDhzfWTTBtjS7DSFnxqpTsgXwA1L7Z356GAkekMooxzQW_x0xOg/exec',
   
   // Google OAuth 2.0 Client ID
   GOOGLE_CLIENT_ID: '20979828869-0mbv7uonhcdu9ivdgntkcdg8k3hb4msr.apps.googleusercontent.com'
